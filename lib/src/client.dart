@@ -20,15 +20,15 @@ class ApiClient implements Client {
   final http.Client _client;
 
   @override
-  Future<Response<T>?> head<T>(Uri url, {Map<String, String>? headers}) =>
+  Future<Response<T>> head<T>(Uri url, {Map<String, String>? headers}) =>
       _send<T>('HEAD', url, headers);
 
   @override
-  Future<Response<T>?> get<T>(Uri url, {Map<String, String>? headers}) =>
+  Future<Response<T>> get<T>(Uri url, {Map<String, String>? headers}) =>
       _send<T>('GET', url, headers);
 
   @override
-  Future<Response<T>?> post<T>(
+  Future<Response<T>> post<T>(
     Uri url, {
     Map<String, String>? headers,
     Object? body,
@@ -36,7 +36,7 @@ class ApiClient implements Client {
       _send<T>('POST', url, headers, body);
 
   @override
-  Future<Response<T>?> put<T>(
+  Future<Response<T>> put<T>(
     Uri url, {
     Map<String, String>? headers,
     Object? body,
@@ -44,7 +44,7 @@ class ApiClient implements Client {
       _send<T>('PUT', url, headers, body);
 
   @override
-  Future<Response<T>?> patch<T>(
+  Future<Response<T>> patch<T>(
     Uri url, {
     Map<String, String>? headers,
     Object? body,
@@ -52,21 +52,21 @@ class ApiClient implements Client {
       _send<T>('PATCH', url, headers, body);
 
   @override
-  Future<Response<T>?> delete<T>(
+  Future<Response<T>> delete<T>(
     Uri url, {
     Map<String, String>? headers,
     Object? body,
   }) =>
       _send<T>('DELETE', url, headers, body);
 
-  Future<Response<T>?> _send<T>(
+  Future<Response<T>> _send<T>(
     String method,
     Uri url,
     Map<String, String>? headers, [
     Object? body,
   ]) async {
     // Create the request for the interceptors.
-    Request? request = Request(
+    Request request = Request(
       method: method,
       url: url,
       headers: headers ?? {},
@@ -75,16 +75,18 @@ class ApiClient implements Client {
 
     // Intercept the request.
     for (final interceptor in interceptors.where((i) => i.onRequest != null)) {
-      request = await interceptor.onRequest!(request!);
+      request = await interceptor.onRequest!(request);
 
-      // If any of the interceptors did not return a request object cancel.
-      if (request == null) {
-        return null;
-      }
+      // todo - interceptors cannot cancel the request for now
+      // // If any of the interceptors did not return a request object, cancel.
+      // if (request == null) {
+      //
+      //   return null;
+      // }
     }
 
     // Create the request to pass to the inner client.
-    final httpRequest = http.Request(request!.method, request.url);
+    final httpRequest = http.Request(request.method, request.url);
     httpRequest.headers.addAll(request.headers);
 
     if (request.body != null) {
@@ -135,13 +137,14 @@ class ApiClient implements Client {
         in interceptors.where((i) => i.onResponse != null).toList().reversed) {
       response = await interceptor.onResponse!(response!) as Response<T>?;
 
-      // If any of the interceptors did not return a response object cancel.
-      if (response == null) {
-        return null;
-      }
+      // todo - interceptors cannot cancel the request for now
+      // // If any of the interceptors did not return a response object cancel.
+      // if (response == null) {
+      //   return null;
+      // }
     }
 
-    return response;
+    return response!;
   }
 
   void close() {
