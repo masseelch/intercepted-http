@@ -1,5 +1,3 @@
-import 'package:http/http.dart' as http;
-
 import 'request.dart';
 import 'response.dart';
 
@@ -7,13 +5,13 @@ class ApiException implements Exception {
   ApiException({
     required this.request,
     this.response,
-    required this.clientException,
+    required this.exception,
   });
 
   final Request request;
   final Response? response;
-  final http.ClientException clientException;
+  final Object exception;
 
   @override
-  String toString() => clientException.message; // todo - better
+  String toString() => exception.toString(); // todo - better
 }

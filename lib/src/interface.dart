@@ -1,17 +1,17 @@
 import 'response.dart';
 
 abstract class Client {
-  Future<Response?> head(Uri url, {Map<String, String>? headers});
+  Future<Response<T>?> head<T>(Uri url, {Map<String, String>? headers});
 
-  Future<Response?> get(Uri url, {Map<String, String>? headers});
+  Future<Response<T>?> get<T>(Uri url, {Map<String, String>? headers});
 
-  Future<Response?> post(Uri url, {Map<String, String>? headers, Object? body});
+  Future<Response<T>?> post<T>(Uri url, {Map<String, String>? headers, Object? body});
 
-  Future<Response?> put(Uri url, {Map<String, String>? headers, Object? body});
+  Future<Response<T>?> put<T>(Uri url, {Map<String, String>? headers, Object? body});
 
-  Future<Response?> patch(Uri url,
+  Future<Response<T>?> patch<T>(Uri url,
       {Map<String, String>? headers, Object? body});
 
-  Future<Response?> delete(Uri url,
+  Future<Response<T>?> delete<T>(Uri url,
       {Map<String, String>? headers, Object? body});
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:http/http.dart' as http;
+import 'package:intercepted_http/src/transformer.dart';
 
 import 'exception.dart';
 import 'interceptor.dart';
@@ -9,52 +10,56 @@ import 'request.dart';
 import 'response.dart';
 
 class ApiClient implements Client {
-  ApiClient({this.interceptors = const []}) : _client = http.Client();
+  ApiClient({
+    this.interceptors = const [],
+    this.transformer = const DefaultTransformer(),
+  }) : _client = http.Client();
 
   final List<Interceptor> interceptors;
+  final Transformer transformer;
   final http.Client _client;
 
   @override
-  Future<Response?> head(Uri url, {Map<String, String>? headers}) =>
-      _send('HEAD', url, headers);
+  Future<Response<T>?> head<T>(Uri url, {Map<String, String>? headers}) =>
+      _send<T>('HEAD', url, headers);
 
   @override
-  Future<Response?> get(Uri url, {Map<String, String>? headers}) =>
-      _send('GET', url, headers);
+  Future<Response<T>?> get<T>(Uri url, {Map<String, String>? headers}) =>
+      _send<T>('GET', url, headers);
 
   @override
-  Future<Response?> post(
+  Future<Response<T>?> post<T>(
     Uri url, {
     Map<String, String>? headers,
     Object? body,
   }) =>
-      _send('POST', url, headers, body);
+      _send<T>('POST', url, headers, body);
 
   @override
-  Future<Response?> put(
+  Future<Response<T>?> put<T>(
     Uri url, {
     Map<String, String>? headers,
     Object? body,
   }) =>
-      _send('PUT', url, headers, body);
+      _send<T>('PUT', url, headers, body);
 
   @override
-  Future<Response?> patch(
+  Future<Response<T>?> patch<T>(
     Uri url, {
     Map<String, String>? headers,
     Object? body,
   }) =>
-      _send('PATCH', url, headers, body);
+      _send<T>('PATCH', url, headers, body);
 
   @override
-  Future<Response?> delete(
+  Future<Response<T>?> delete<T>(
     Uri url, {
     Map<String, String>? headers,
     Object? body,
   }) =>
-      _send('DELETE', url, headers, body);
+      _send<T>('DELETE', url, headers, body);
 
-  Future<Response?> _send(
+  Future<Response<T>?> _send<T>(
     String method,
     Uri url,
     Map<String, String>? headers, [
@@ -78,28 +83,40 @@ class ApiClient implements Client {
       }
     }
 
-    // Hit the server.
-    Response? response;
+    // Create the request to pass to the inner client.
+    final httpRequest = http.Request(request!.method, request.url);
+    httpRequest.headers.addAll(request.headers);
+
+    if (request.body != null) {
+      httpRequest.body = await transformer.transformRequestData(request);
+    }
+
+    Response<T>? response;
     try {
-      response = Response.fromHttpResponse(
-        await http.Response.fromStream(
-          await _client.send(request!.toHttpRequest()),
-        ),
+      // Hit the server.
+      final httpResponse =
+          await http.Response.fromStream(await _client.send(httpRequest));
+
+      // Transform the data back.
+      response = Response<T>(
+        statusCode: httpResponse.statusCode,
+        headers: httpResponse.headers,
+        body: await transformer.transformResponseData(httpResponse),
       );
-    } on http.ClientException catch (e) {
+    } catch (e) {
       // Catch client-exceptions thrown by the inner client. Pass it to the
       // error interceptors and return whatever they produce to the caller.
       final exception = ApiException(
-        request: request!,
+        request: request,
         response: response,
-        clientException: e,
+        exception: e,
       );
 
       // Intercept the error. If any interceptors returns an response object it
       // is then returned to the caller. If no response object gets returned the
       // given exception is thrown to the caller.
       for (final interceptor in interceptors.where((i) => i.onError != null)) {
-        response = await interceptor.onError!(exception);
+        response = await interceptor.onError!(exception) as Response<T>?;
 
         // If any of the interceptors returned a response object get it to the
         // caller.
@@ -114,7 +131,7 @@ class ApiClient implements Client {
 
     // Intercept the response.
     for (final interceptor in interceptors.where((i) => i.onResponse != null)) {
-      response = await interceptor.onResponse!(response!);
+      response = await interceptor.onResponse!(response!) as Response<T>?;
 
       // If any of the interceptors did not return a response object cancel.
       if (response == null) {
