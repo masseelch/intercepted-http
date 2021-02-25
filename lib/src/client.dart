@@ -131,7 +131,8 @@ class ApiClient implements Client {
     }
 
     // Intercept the response.
-    for (final interceptor in interceptors.where((i) => i.onResponse != null)) {
+    for (final interceptor
+        in interceptors.where((i) => i.onResponse != null).toList().reversed) {
       response = await interceptor.onResponse!(response!) as Response<T>?;
 
       // If any of the interceptors did not return a response object cancel.
