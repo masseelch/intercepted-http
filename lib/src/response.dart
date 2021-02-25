@@ -1,9 +1,14 @@
+import 'package:intercepted_http/intercepted_http.dart';
+
 class Response<T> {
   Response({
+    required this.request,
     required this.statusCode,
     required this.headers,
     required this.body,
   });
+
+  final Request request;
 
   final int statusCode;
 

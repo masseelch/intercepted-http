@@ -99,6 +99,7 @@ class ApiClient implements Client {
 
       // Transform the data back.
       response = Response<T>(
+        request: request,
         statusCode: httpResponse.statusCode,
         headers: httpResponse.headers,
         body: await transformer.transformResponseData(httpResponse),
