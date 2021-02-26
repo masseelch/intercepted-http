@@ -12,13 +12,15 @@ import 'util.dart';
 
 class ApiClient implements Client {
   ApiClient({
-    this.interceptors = const [],
+    this.interceptors = const Interceptors(),
     this.transformer = const DefaultTransformer(),
+    this.debug = false,
   }) : _client = http.Client();
 
-  final List<Interceptor> interceptors;
+  final Interceptors interceptors;
   final Transformer transformer;
   final http.Client _client;
+  final bool debug;
 
   @override
   Future<Response> head(Uri url, {Map<String, String>? headers}) =>
@@ -75,15 +77,19 @@ class ApiClient implements Client {
     );
 
     // Intercept the request.
-    for (final interceptor in interceptors) {
+    for (final interceptor in interceptors.enabledInterceptors) {
+      _debug('Calling request-interceptor $interceptor');
+
       final requestOrResponse = await interceptor.onRequest(request);
 
-      // If the current request-interceptor returned an response 
-      // cancel the request and return the response to the caller. 
+      // If the current request-interceptor returned an response
+      // cancel the request and return the response to the caller.
       if (requestOrResponse is Response) {
+        _debug('\tcustom response detected');
+
         return requestOrResponse;
       }
-      
+
       request = requestOrResponse as Request;
     }
 
@@ -100,7 +106,7 @@ class ApiClient implements Client {
 
     httpRequest.headers.addAll(request.headers);
 
-    late Response response;
+    Response? response;
     try {
       // Hit the server.
       final httpResponse =
@@ -113,7 +119,18 @@ class ApiClient implements Client {
         headers: httpResponse.headers,
         body: await transformer.transformResponseData(httpResponse),
       );
+
+      // Check if the response was successful.
+      if (httpResponse.statusCode >= 400) {
+        var message = 'Request to $url failed with status ${httpResponse.statusCode}';
+        if (httpResponse.reasonPhrase != null) {
+          message = '$message: ${httpResponse.reasonPhrase}';
+        }
+        throw http.ClientException('$message.', url);
+      }
     } catch (e, t) {
+      _debug('Exception: $e');
+
       // Catch client-exceptions thrown by the inner client. Pass it to the
       // error interceptors and return whatever they produce to the caller.
       ApiException exception = ApiException(
@@ -125,12 +142,16 @@ class ApiClient implements Client {
 
       // Intercept the error. If any interceptor returns a response object it
       // is then returned to the caller. Otherwise throw the exception.
-      for (final interceptor in interceptors) {
+      for (final interceptor in interceptors.enabledInterceptors) {
+        _debug('Calling error-interceptor $interceptor');
+
         final responseOrException = await interceptor.onError(exception);
 
-        // If the current error-interceptor returned an response 
-        // cancel the request and return the response to the caller. 
+        // If the current error-interceptor returned an response
+        // cancel the request and return the response to the caller.
         if (responseOrException is Response) {
+          _debug('\tcustom response detected');
+
           return responseOrException;
         }
 
@@ -142,14 +163,20 @@ class ApiClient implements Client {
     }
 
     // Intercept the response.
-    for (final interceptor in interceptors) {
-      response = await interceptor.onResponse(response);
+    for (final interceptor in interceptors.enabledInterceptors) {
+      _debug('Calling response-interceptor $interceptor');
+
+      response = await interceptor.onResponse(response!);
     }
 
-    return response;
+    return response!;
   }
 
   void close() {
     _client.close();
+  }
+
+  _debug(String msg) {
+    if (debug) print(msg);
   }
 }

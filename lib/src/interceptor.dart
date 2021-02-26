@@ -8,7 +8,15 @@ typedef ResponseInterceptor = Future<Response> Function(Response);
 typedef ErrorInterceptor = Future<ResponseOrException> Function(ApiException);
 
 abstract class Interceptor {
-  const Interceptor();
+  String get name;
+
+  bool _enabled = true;
+
+  bool get enabled => _enabled;
+
+  void disable() => _enabled = false;
+
+  void enable() => _enabled = true;
 
   Future<RequestOrResponse> onRequest(Request request) async => request;
 
@@ -16,4 +24,26 @@ abstract class Interceptor {
 
   Future<ResponseOrException> onError(ApiException exception) async =>
       exception;
+
+  String toString() => name;
+}
+
+class Interceptors {
+  const Interceptors() : _interceptors = const {};
+
+  Interceptors.fromList(List<Interceptor> interceptors)
+      : _interceptors = {for (var i in interceptors) i.name: i};
+
+  final Map<String, Interceptor> _interceptors;
+
+  void enableInterceptorByName(String name) {
+    _interceptors[name]?.enable();
+  }
+
+  void disableInterceptorByName(String name) {
+    _interceptors[name]?.disable();
+  }
+
+  Iterable<Interceptor> get enabledInterceptors =>
+      _interceptors.values.where((i) => i.enabled);
 }
