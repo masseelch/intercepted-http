@@ -1,17 +1,24 @@
 import 'response.dart';
 
+// Just a marker interface for Request/Response
+abstract class RequestOrResponse {}
+
+// Just a marker interface for Response/ApiException
+abstract class ResponseOrException {}
+
+
 abstract class Client {
-  Future<Response<T>> head<T>(Uri url, {Map<String, String>? headers});
+  Future<Response> head(Uri url, {Map<String, String>? headers});
 
-  Future<Response<T>> get<T>(Uri url, {Map<String, String>? headers});
+  Future<Response> get(Uri url, {Map<String, String>? headers});
 
-  Future<Response<T>> post<T>(Uri url, {Map<String, String>? headers, Object? body});
+  Future<Response> post(Uri url, {Map<String, String>? headers, Object? body});
 
-  Future<Response<T>> put<T>(Uri url, {Map<String, String>? headers, Object? body});
+  Future<Response> put(Uri url, {Map<String, String>? headers, Object? body});
 
-  Future<Response<T>> patch<T>(Uri url,
+  Future<Response> patch(Uri url,
       {Map<String, String>? headers, Object? body});
 
-  Future<Response<T>> delete<T>(Uri url,
+  Future<Response> delete(Uri url,
       {Map<String, String>? headers, Object? body});
 }

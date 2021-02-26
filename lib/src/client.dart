@@ -8,6 +8,7 @@ import 'interceptor.dart';
 import 'interface.dart';
 import 'request.dart';
 import 'response.dart';
+import 'util.dart';
 
 class ApiClient implements Client {
   ApiClient({
@@ -20,46 +21,46 @@ class ApiClient implements Client {
   final http.Client _client;
 
   @override
-  Future<Response<T>> head<T>(Uri url, {Map<String, String>? headers}) =>
-      _send<T>('HEAD', url, headers);
+  Future<Response> head(Uri url, {Map<String, String>? headers}) =>
+      _send('HEAD', url, headers);
 
   @override
-  Future<Response<T>> get<T>(Uri url, {Map<String, String>? headers}) =>
-      _send<T>('GET', url, headers);
+  Future<Response> get(Uri url, {Map<String, String>? headers}) =>
+      _send('GET', url, headers);
 
   @override
-  Future<Response<T>> post<T>(
+  Future<Response> post(
     Uri url, {
     Map<String, String>? headers,
     Object? body,
   }) =>
-      _send<T>('POST', url, headers, body);
+      _send('POST', url, headers, body);
 
   @override
-  Future<Response<T>> put<T>(
+  Future<Response> put(
     Uri url, {
     Map<String, String>? headers,
     Object? body,
   }) =>
-      _send<T>('PUT', url, headers, body);
+      _send('PUT', url, headers, body);
 
   @override
-  Future<Response<T>> patch<T>(
+  Future<Response> patch(
     Uri url, {
     Map<String, String>? headers,
     Object? body,
   }) =>
-      _send<T>('PATCH', url, headers, body);
+      _send('PATCH', url, headers, body);
 
   @override
-  Future<Response<T>> delete<T>(
+  Future<Response> delete(
     Uri url, {
     Map<String, String>? headers,
     Object? body,
   }) =>
-      _send<T>('DELETE', url, headers, body);
+      _send('DELETE', url, headers, body);
 
-  Future<Response<T>> _send<T>(
+  Future<Response> _send(
     String method,
     Uri url,
     Map<String, String>? headers, [
@@ -74,58 +75,66 @@ class ApiClient implements Client {
     );
 
     // Intercept the request.
-    for (final interceptor in interceptors.where((i) => i.onRequest != null)) {
-      request = await interceptor.onRequest!(request);
+    for (final interceptor in interceptors) {
+      final requestOrResponse = await interceptor.onRequest(request);
 
-      // todo - interceptors cannot cancel the request for now
-      // // If any of the interceptors did not return a request object, cancel.
-      // if (request == null) {
-      //
-      //   return null;
-      // }
+      // If the current request-interceptor returned an response 
+      // cancel the request and return the response to the caller. 
+      if (requestOrResponse is Response) {
+        return requestOrResponse;
+      }
+      
+      request = requestOrResponse as Request;
     }
 
     // Create the request to pass to the inner client.
     final httpRequest = http.Request(request.method, request.url);
-    httpRequest.headers.addAll(request.headers);
 
     if (request.body != null) {
       httpRequest.body = await transformer.transformRequestData(request);
+
+      if (!request.headers.containsKey('content-type')) {
+        request.headers['content-type'] = defaultContentType(request);
+      }
     }
 
-    Response<T>? response;
+    httpRequest.headers.addAll(request.headers);
+
+    late Response response;
     try {
       // Hit the server.
       final httpResponse =
           await http.Response.fromStream(await _client.send(httpRequest));
 
       // Transform the data back.
-      response = Response<T>(
+      response = Response(
         request: request,
         statusCode: httpResponse.statusCode,
         headers: httpResponse.headers,
         body: await transformer.transformResponseData(httpResponse),
       );
-    } catch (e) {
+    } catch (e, t) {
       // Catch client-exceptions thrown by the inner client. Pass it to the
       // error interceptors and return whatever they produce to the caller.
-      final exception = ApiException(
+      ApiException exception = ApiException(
         request: request,
         response: response,
         exception: e,
+        trace: t,
       );
 
-      // Intercept the error. If any interceptors returns an response object it
-      // is then returned to the caller. If no response object gets returned the
-      // given exception is thrown to the caller.
-      for (final interceptor in interceptors.where((i) => i.onError != null)) {
-        response = await interceptor.onError!(exception) as Response<T>?;
+      // Intercept the error. If any interceptor returns a response object it
+      // is then returned to the caller. Otherwise throw the exception.
+      for (final interceptor in interceptors) {
+        final responseOrException = await interceptor.onError(exception);
 
-        // If any of the interceptors returned a response object get it to the
-        // caller.
-        if (response != null) {
-          return response;
+        // If the current error-interceptor returned an response 
+        // cancel the request and return the response to the caller. 
+        if (responseOrException is Response) {
+          return responseOrException;
         }
+
+        exception = responseOrException as ApiException;
       }
 
       // The error-interceptors did not cancel the exception. Throw it.
@@ -133,18 +142,11 @@ class ApiClient implements Client {
     }
 
     // Intercept the response.
-    for (final interceptor
-        in interceptors.where((i) => i.onResponse != null).toList().reversed) {
-      response = await interceptor.onResponse!(response!) as Response<T>?;
-
-      // todo - interceptors cannot cancel the request for now
-      // // If any of the interceptors did not return a response object cancel.
-      // if (response == null) {
-      //   return null;
-      // }
+    for (final interceptor in interceptors) {
+      response = await interceptor.onResponse(response);
     }
 
-    return response!;
+    return response;
   }
 
   void close() {

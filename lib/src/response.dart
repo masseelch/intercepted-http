@@ -1,6 +1,6 @@
 import 'package:intercepted_http/intercepted_http.dart';
 
-class Response<T> {
+class Response implements RequestOrResponse, ResponseOrException {
   Response({
     required this.request,
     required this.statusCode,
@@ -16,11 +16,5 @@ class Response<T> {
   Map<String, String> headers;
 
   // The response body.
-  T body;
-
-  // Response.fromHttpResponse(http.Response response)
-  //     : statusCode = response.statusCode,
-  //       headers = response.headers,
-  //       // bodyBytes = response.bodyBytes,
-  //       body = response.body as T;
+  dynamic body;
 }

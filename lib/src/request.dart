@@ -1,4 +1,6 @@
-class Request {
+import 'interface.dart';
+
+class Request implements RequestOrResponse{
   Request({
     required this.method,
     required this.url,
@@ -17,4 +19,16 @@ class Request {
 
   // The body of this request.
   dynamic body;
+
+  Request copyWith({
+    Uri? url,
+    Map<String, String>? headers,
+    dynamic? body,
+  }) =>
+      Request(
+        method: method,
+        url: url ?? this.url,
+        headers: headers ?? this.headers,
+        body: body ?? this.body,
+      );
 }
