@@ -24,7 +24,7 @@ class DefaultTransformer implements Transformer {
           return jsonEncode(request.body as Map);
         }
 
-        return mapToQuery((request.body as Map).cast<String, String>());
+        return mapToQuery(request.body as Map);
       } else {
         throw ArgumentError('Invalid request body "${request.body}".');
       }

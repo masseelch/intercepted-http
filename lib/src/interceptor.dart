@@ -3,10 +3,6 @@ import 'interface.dart';
 import 'request.dart';
 import 'response.dart';
 
-typedef RequestInterceptor = Future<RequestOrResponse> Function(Request);
-typedef ResponseInterceptor = Future<Response> Function(Response);
-typedef ErrorInterceptor = Future<ResponseOrException> Function(ApiException);
-
 abstract class Interceptor {
   String get name;
 

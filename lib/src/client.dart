@@ -14,13 +14,11 @@ class ApiClient implements Client {
   ApiClient({
     this.interceptors = const Interceptors(),
     this.transformer = const DefaultTransformer(),
-    this.debug = false,
   }) : _client = http.Client();
 
   final Interceptors interceptors;
   final Transformer transformer;
   final http.Client _client;
-  final bool debug;
 
   @override
   Future<Response> head(Uri url, {Map<String, String>? headers}) =>
@@ -78,15 +76,11 @@ class ApiClient implements Client {
 
     // Intercept the request.
     for (final interceptor in interceptors.enabledInterceptors) {
-      _debug('Calling request-interceptor $interceptor');
-
       final requestOrResponse = await interceptor.onRequest(request);
 
       // If the current request-interceptor returned an response
       // cancel the request and return the response to the caller.
       if (requestOrResponse is Response) {
-        _debug('\tcustom response detected');
-
         return requestOrResponse;
       }
 
@@ -97,11 +91,11 @@ class ApiClient implements Client {
     final httpRequest = http.Request(request.method, request.url);
 
     if (request.body != null) {
-      httpRequest.body = await transformer.transformRequestData(request);
-
       if (!request.headers.containsKey('content-type')) {
         request.headers['content-type'] = defaultContentType(request);
       }
+
+      httpRequest.body = await transformer.transformRequestData(request);
     }
 
     httpRequest.headers.addAll(request.headers);
@@ -129,8 +123,6 @@ class ApiClient implements Client {
         throw http.ClientException('$message.', url);
       }
     } catch (e, t) {
-      _debug('Exception: $e');
-
       // Catch client-exceptions thrown by the inner client. Pass it to the
       // error interceptors and return whatever they produce to the caller.
       ApiException exception = ApiException(
@@ -143,15 +135,11 @@ class ApiClient implements Client {
       // Intercept the error. If any interceptor returns a response object it
       // is then returned to the caller. Otherwise throw the exception.
       for (final interceptor in interceptors.enabledInterceptors) {
-        _debug('Calling error-interceptor $interceptor');
-
         final responseOrException = await interceptor.onError(exception);
 
         // If the current error-interceptor returned an response
         // cancel the request and return the response to the caller.
         if (responseOrException is Response) {
-          _debug('\tcustom response detected');
-
           return responseOrException;
         }
 
@@ -164,8 +152,6 @@ class ApiClient implements Client {
 
     // Intercept the response.
     for (final interceptor in interceptors.enabledInterceptors) {
-      _debug('Calling response-interceptor $interceptor');
-
       response = await interceptor.onResponse(response!);
     }
 
@@ -174,9 +160,5 @@ class ApiClient implements Client {
 
   void close() {
     _client.close();
-  }
-
-  _debug(String msg) {
-    if (debug) print(msg);
   }
 }
