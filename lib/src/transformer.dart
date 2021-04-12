@@ -16,17 +16,21 @@ class DefaultTransformer implements Transformer {
 
   @override
   Future<String> transformRequestData(Request request) async {
-    if (request.body != null) {
-      if (request.body is String) {
-        return request.body;
-      } else if (request.body is Map) {
-        if (hasJsonContentType(request.headers)) {
-          return jsonEncode(request.body as Map);
-        }
+    if (request.multipart) {
 
-        return mapToQuery(request.body as Map);
-      } else {
-        throw ArgumentError('Invalid request body "${request.body}".');
+    } else {
+      if (request.body != null) {
+        if (request.body is String) {
+          return request.body;
+        } else if (request.body is Map) {
+          if (hasJsonContentType(request.headers)) {
+            return jsonEncode(request.body as Map);
+          }
+
+          return mapToQuery(request.body as Map);
+        } else {
+          throw ArgumentError('Invalid request body "${request.body}".');
+        }
       }
     }
 

@@ -1,5 +1,7 @@
 library intercepted_http;
 
+export 'package:http/src/multipart_file.dart';
+
 export 'src/client.dart';
 export 'src/exception.dart';
 export 'src/interceptor.dart';

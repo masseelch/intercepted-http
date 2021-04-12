@@ -22,58 +22,71 @@ class ApiClient implements Client {
 
   @override
   Future<Response> head(Uri url, {Map<String, String>? headers}) =>
-      _send('HEAD', url, headers);
+      _send(Request(
+        method: 'HEAD',
+        url: url,
+        headers: headers,
+      ));
 
   @override
   Future<Response> get(Uri url, {Map<String, String>? headers}) =>
-      _send('GET', url, headers);
+      _send(Request(
+        method: 'GET',
+        url: url,
+        headers: headers,
+      ));
 
   @override
-  Future<Response> post(
-    Uri url, {
-    Map<String, String>? headers,
-    Object? body,
-  }) =>
-      _send('POST', url, headers, body);
+  Future<Response> post(Uri url, {Map<String, String>? headers, Object? body}) =>
+      _send(Request(
+        method: 'POST',
+        url: url,
+        headers: headers,
+        body: body,
+      ));
 
   @override
-  Future<Response> put(
-    Uri url, {
-    Map<String, String>? headers,
-    Object? body,
-  }) =>
-      _send('PUT', url, headers, body);
+  Future<Response> put(Uri url, {Map<String, String>? headers, Object? body}) =>
+      _send(Request(
+        method: 'PUT',
+        url: url,
+        headers: headers,
+        body: body,
+      ));
 
   @override
-  Future<Response> patch(
-    Uri url, {
-    Map<String, String>? headers,
-    Object? body,
-  }) =>
-      _send('PATCH', url, headers, body);
+  Future<Response> patch(Uri url, {Map<String, String>? headers, Object? body}) =>
+      _send(Request(
+        method: 'PATCH',
+        url: url,
+        headers: headers,
+        body: body,
+      ));
 
   @override
-  Future<Response> delete(
-    Uri url, {
+  Future<Response> delete(Uri url, {Map<String, String>? headers, Object? body}) =>
+      _send(Request(
+        method: 'DELETE',
+        url: url,
+        headers: headers,
+        body: body,
+      ));
+
+  Future<Response> multipart(Uri url, {
     Map<String, String>? headers,
-    Object? body,
+    Map<String, String>? fields,
+    List<http.MultipartFile>? files,
   }) =>
-      _send('DELETE', url, headers, body);
+      _send(Request(
+        method: 'POST',
+        url: url,
+        multipart: true,
+        headers: headers,
+        fields: fields,
+        files: files,
+      ));
 
-  Future<Response> _send(
-    String method,
-    Uri url,
-    Map<String, String>? headers, [
-    Object? body,
-  ]) async {
-    // Create the request for the interceptors.
-    Request request = Request(
-      method: method,
-      url: url,
-      headers: headers ?? {},
-      body: body,
-    );
-
+  Future<Response> _send(Request request) async {
     // Intercept the request.
     for (final interceptor in interceptors.enabledInterceptors) {
       final requestOrResponse = await interceptor.onRequest(request);
@@ -87,24 +100,16 @@ class ApiClient implements Client {
       request = requestOrResponse as Request;
     }
 
-    // Create the request to pass to the inner client.
-    final httpRequest = http.Request(request.method, request.url);
+    // Create the request to pass to the inner client. This method will set the body / fields / files accordingly.
+    final httpRequest = await _createHttpRequest(request);
 
-    if (request.body != null) {
-      if (!request.headers.containsKey('content-type')) {
-        request.headers['content-type'] = defaultContentType(request);
-      }
-
-      httpRequest.body = await transformer.transformRequestData(request);
-    }
-
+    // Make sure the headers are all transferred.
     httpRequest.headers.addAll(request.headers);
 
     Response? response;
     try {
       // Hit the server.
-      final httpResponse =
-          await http.Response.fromStream(await _client.send(httpRequest));
+      final httpResponse = await http.Response.fromStream(await _client.send(httpRequest));
 
       // Transform the data back.
       response = Response(
@@ -116,11 +121,11 @@ class ApiClient implements Client {
 
       // Check if the response was successful.
       if (httpResponse.statusCode >= 400) {
-        var message = 'Request to $url failed with status ${httpResponse.statusCode}';
+        var message = 'Request to ${request.url} failed with status ${httpResponse.statusCode}';
         if (httpResponse.reasonPhrase != null) {
           message = '$message: ${httpResponse.reasonPhrase}';
         }
-        throw http.ClientException('$message.', url);
+        throw http.ClientException('$message.', request.url);
       }
     } catch (e, t) {
       // Catch client-exceptions thrown by the inner client. Pass it to the
@@ -156,6 +161,29 @@ class ApiClient implements Client {
     }
 
     return response!;
+  }
+
+  Future<http.BaseRequest> _createHttpRequest(Request request) async {
+    if (request.multipart) {
+      final httpRequest = http.MultipartRequest(request.method, request.url);
+
+      httpRequest.fields.addAll(request.fields);
+      httpRequest.files.addAll(request.files);
+
+      return httpRequest;
+    } else {
+      final httpRequest = http.Request(request.method, request.url);
+
+      if (request.body != null) {
+        if (!request.headers.containsKey('content-type')) {
+          request.headers['content-type'] = defaultContentType(request);
+        }
+
+        httpRequest.body = await transformer.transformRequestData(request);
+      }
+
+      return httpRequest;
+    }
   }
 
   void close() {

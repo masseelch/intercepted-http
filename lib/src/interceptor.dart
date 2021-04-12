@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'exception.dart';
 import 'interface.dart';
 import 'request.dart';
